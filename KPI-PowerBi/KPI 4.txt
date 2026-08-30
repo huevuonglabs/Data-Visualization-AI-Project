@@ -1,0 +1,142 @@
+Card 4 = 
+VAR _sales     = [Total Sales]
+VAR _salesLY   = [Sales LY]
+VAR _diff      = _sales - _salesLY
+VAR _pct       = DIVIDE(_diff, _salesLY)
+VAR _isGrowth  = _diff >= 0
+VAR _arrow     = IF(_isGrowth, "↑", "↓")
+VAR _pillBg    = IF(_isGrowth, "#E8EEFC", "#FDEBE0")
+VAR _pillText  = IF(_isGrowth, "#3B5BDB", "#E8590C")
+VAR _lineColor = IF(_isGrowth, "#3B5BDB", "#E8590C")
+VAR _salesFmt  = FORMAT(_sales, "#,##0")
+VAR _diffFmt   = _arrow & " +" & FORMAT(ABS(_diff), "#,##0")
+VAR _pctFmt    = _arrow & " " & FORMAT(ABS(_pct), "0.0%")
+VAR _lyFmt     = FORMAT(_salesLY, "#,##0")
+
+-- Build monthly trend table (last 12 months)
+VAR _maxDate = MAX('Dates'[Date])
+VAR _monthlyTable =
+    ADDCOLUMNS(
+        SUMMARIZE(
+            CALCULATETABLE(
+                'Dates',
+                DATESINPERIOD('Dates'[Date], _maxDate, -12, MONTH)
+            ),
+            'Dates'[Year], 'Dates'[MonthNo]
+        ),
+        "MonthSales", CALCULATE([Total Sales])
+    )
+VAR _minVal = MINX(_monthlyTable, [MonthSales])
+VAR _maxVal = MAXX(_monthlyTable, [MonthSales])
+VAR _range  = MAX(_maxVal - _minVal, 1)
+VAR _n      = COUNTROWS(_monthlyTable)
+
+VAR _chartW = 300
+VAR _chartH = 36
+VAR _step   = DIVIDE(_chartW, MAX(_n - 1, 1))
+
+VAR _indexedTable =
+    ADDCOLUMNS(
+        _monthlyTable,
+        "Idx", RANKX(_monthlyTable, [Year] * 100 + [MonthNo], , ASC, DENSE) - 1
+    )
+
+VAR _points =
+    CONCATENATEX(
+        _indexedTable,
+        VAR _x = [Idx] * _step
+        VAR _y = 4 + (_chartH - 8) - DIVIDE(([MonthSales] - _minVal), _range) * (_chartH - 8)
+        RETURN ROUND(_x, 1) & "," & ROUND(_y, 1),
+        " ",
+        [Idx], ASC
+    )
+
+VAR _areaPoints = "0," & _chartH & " " & _points & " " & _chartW & "," & _chartH
+
+-- ===== Top 3 Models + Others =====
+VAR _productTable =
+    ADDCOLUMNS(
+        SUMMARIZE('Products', 'Products'[Model]),
+        "ProdSales", CALCULATE([Total Sales])
+    )
+VAR _top3 =
+    TOPN(3, _productTable, [ProdSales], DESC)
+VAR _top3Sum = SUMX(_top3, [ProdSales])
+VAR _othersSales = MAX(_sales - _top3Sum, 0)
+VAR _maxBarVal = MAX(MAXX(_top3, [ProdSales]), _othersSales)
+
+VAR _rankedTop3 =
+    ADDCOLUMNS(
+        _top3,
+        "Rank", RANKX(_top3, [ProdSales], , DESC, DENSE)
+    )
+
+VAR _barsHTML =
+    CONCATENATEX(
+        _rankedTop3,
+        VAR _widthPct = ROUND(DIVIDE([ProdSales], _maxBarVal) * 100, 1)
+        RETURN
+        "<div style='display:flex; align-items:center; gap:12px; margin-bottom:14px;'>" &
+          "<span style='font-size:13px; color:#374151; font-weight:500; min-width:90px;'>" & [Model] & "</span>" &
+          "<div style='flex:1; background:#EDEFF3; border-radius:8px; overflow:hidden; height:10px; position:relative;'>" &
+            "<div style='background:" & _lineColor & "; width:" & _widthPct & "%; height:100%; border-radius:8px;'></div>" &
+          "</div>" &
+          "<span style='font-size:13px; color:#111827; font-weight:700; min-width:50px; text-align:right;'>" & FORMAT([ProdSales], "#,##0") & "</span>" &
+        "</div>",
+        "",
+        [Rank], ASC
+    )
+
+VAR _othersWidthPct = ROUND(DIVIDE(_othersSales, _maxBarVal) * 100, 1)
+VAR _othersBarHTML =
+    "<div style='display:flex; align-items:center; gap:12px;'>" &
+      "<span style='font-size:13px; color:#9CA3AF; font-weight:500; min-width:90px;'>Others</span>" &
+      "<div style='flex:1; background:#EDEFF3; border-radius:8px; overflow:hidden; height:10px; position:relative;'>" &
+        "<div style='background:#C6CCD6; width:" & _othersWidthPct & "%; height:100%; border-radius:8px;'></div>" &
+      "</div>" &
+      "<span style='font-size:13px; color:#111827; font-weight:700; min-width:50px; text-align:right;'>" & FORMAT(_othersSales, "#,##0") & "</span>" &
+    "</div>"
+
+RETURN
+"<div style='font-family:Segoe UI, sans-serif; width:100%; box-sizing:border-box; background:#fff; border:1px solid #E5E7EB; border-radius:16px; overflow:hidden;'>" &
+
+  -- Sales card
+  "<div style='padding:18px 0; box-sizing:border-box; display:flex; flex-direction:column;'>" &
+    "<div style='display:flex; align-items:center; gap:6px; margin-bottom:12px; white-space:nowrap; padding:0 22px; flex-shrink:0;'>" &
+      "<svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='" & _lineColor & "' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'>" &
+        "<polyline points='2,17 9,10 13,14 22,4'></polyline>" &
+        "<polyline points='16,4 22,4 22,10'></polyline>" &
+      "</svg>" &
+      "<span style='color:#4B5563; font-size:13px; font-weight:600;'>Sales</span>" &
+    "</div>" &
+    "<div style='display:flex; align-items:center; gap:10px; flex-wrap:nowrap; margin-bottom:12px; white-space:nowrap; padding:0 22px; flex-shrink:0;'>" &
+      "<span style='font-size:34px; font-weight:700; color:#111827; white-space:nowrap;'>" & _salesFmt & "</span>" &
+      "<span style='background:" & _pillBg & "; color:" & _pillText & "; padding:3px 9px; border-radius:11px; font-size:12px; font-weight:600; white-space:nowrap;'>" & _diffFmt & "</span>" &
+      "<span style='background:" & _pillBg & "; color:" & _pillText & "; padding:3px 9px; border-radius:11px; font-size:12px; font-weight:600; white-space:nowrap;'>" & _pctFmt & "</span>" &
+    "</div>" &
+    "<div style='display:flex; width:100%; min-width:0; margin-bottom:10px; flex-shrink:0; padding:0 10px; box-sizing:border-box;'>" &
+      "<svg viewBox='0 0 " & _chartW & " " & _chartH & "' preserveAspectRatio='none' style='display:block; width:100%; height:36px; flex:1 1 auto; min-width:0;'>" &
+        "<defs>" &
+          "<linearGradient id='areaGrad' x1='0' y1='0' x2='0' y2='1'>" &
+            "<stop offset='0%' stop-color='" & _lineColor & "' stop-opacity='0.25'></stop>" &
+            "<stop offset='100%' stop-color='" & _lineColor & "' stop-opacity='0'></stop>" &
+          "</linearGradient>" &
+        "</defs>" &
+        "<polygon points='" & _areaPoints & "' fill='url(#areaGrad)'></polygon>" &
+        "<polyline points='" & _points & "' fill='none' stroke='" & _lineColor & "' stroke-width='1.8' vector-effect='non-scaling-stroke' stroke-linecap='round' stroke-linejoin='round'></polyline>" &
+      "</svg>" &
+    "</div>" &
+    "<div style='font-size:12px; color:#6B7280; white-space:nowrap; padding:0 22px; flex-shrink:0;'>vs <b style='color:#374151;'>" & _lyFmt & "</b> last year</div>" &
+  "</div>" &
+
+  -- Divider
+  "<div style='border-top:1px solid #EEF0F3; margin:0 22px;'></div>" &
+
+  -- Top 3 models section
+  "<div style='padding:18px 22px;'>" &
+    "<div style='font-size:11px; font-weight:700; color:#9CA3AF; letter-spacing:0.5px; margin-bottom:14px;'>TOP 3 MODELS</div>" &
+    _barsHTML &
+    _othersBarHTML &
+  "</div>" &
+
+"</div>"

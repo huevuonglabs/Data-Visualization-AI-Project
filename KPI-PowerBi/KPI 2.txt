@@ -1,0 +1,31 @@
+Card 2 = 
+VAR _sales     = [Total Sales]
+VAR _salesLY   = [Sales LY]
+VAR _diff      = _sales - _salesLY
+VAR _pct       = DIVIDE(_diff, _salesLY)
+VAR _isGrowth  = _diff >= 0
+VAR _arrow     = IF(_isGrowth, "↑", "↓")
+VAR _pillBg    = IF(_isGrowth, "#E8EEFC", "#FDEBE0")
+VAR _pillText  = IF(_isGrowth, "#3B5BDB", "#E8590C")
+VAR _iconColor = IF(_isGrowth, "#3B5BDB", "#E8590C")
+VAR _salesFmt  = FORMAT(_sales, "#,##0")
+VAR _diffFmt   = _arrow & " +" & FORMAT(ABS(_diff), "#,##0")
+VAR _pctFmt    = _arrow & " " & FORMAT(ABS(_pct), "0.0%")
+VAR _lyFmt     = FORMAT(_salesLY, "#,##0")
+
+RETURN
+"<div style='font-family:Segoe UI, sans-serif; background:#fff; border:1px solid #E5E7EB; border-radius:16px; padding:20px 24px; width:fit-content; min-width:280px; max-width:100%; box-sizing:border-box; overflow:visible;'>" &
+  "<div style='display:flex; align-items:center; gap:8px; margin-bottom:14px; white-space:nowrap;'>" &
+    "<svg width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='" & _iconColor & "' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>" &
+      "<path d='M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2'></path>" &
+      "<circle cx='9' cy='7' r='4'></circle>" &
+    "</svg>" &
+    "<span style='color:#1F2937; font-size:15px; font-weight:600;'>Sales</span>" &
+  "</div>" &
+  "<div style='display:flex; align-items:center; gap:10px; flex-wrap:nowrap; margin-bottom:10px; white-space:nowrap;'>" &
+    "<span style='font-size:36px; font-weight:700; color:#111827; white-space:nowrap;'>" & _salesFmt & "</span>" &
+    "<span style='background:" & _pillBg & "; color:" & _pillText & "; padding:4px 10px; border-radius:12px; font-size:13px; font-weight:600; white-space:nowrap;'>" & _diffFmt & "</span>" &
+    "<span style='background:" & _pillBg & "; color:" & _pillText & "; padding:4px 10px; border-radius:12px; font-size:13px; font-weight:600; white-space:nowrap;'>" & _pctFmt & "</span>" &
+  "</div>" &
+  "<div style='font-size:13px; color:#6B7280; white-space:nowrap;'>vs <b style='color:#374151;'>" & _lyFmt & "</b> last year</div>" &
+"</div>"

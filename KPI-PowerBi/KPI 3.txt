@@ -1,0 +1,87 @@
+Card 3 = 
+VAR _sales     = [Total Sales]
+VAR _salesLY   = [Sales LY]
+VAR _diff      = _sales - _salesLY
+VAR _pct       = DIVIDE(_diff, _salesLY)
+VAR _isGrowth  = _diff >= 0
+VAR _arrow     = IF(_isGrowth, "↑", "↓")
+VAR _pillBg    = IF(_isGrowth, "#E8EEFC", "#FDEBE0")
+VAR _pillText  = IF(_isGrowth, "#3B5BDB", "#E8590C")
+VAR _lineColor = IF(_isGrowth, "#3B5BDB", "#E8590C")
+VAR _salesFmt  = FORMAT(_sales, "#,##0")
+VAR _diffFmt   = _arrow & " +" & FORMAT(ABS(_diff), "#,##0")
+VAR _pctFmt    = _arrow & " " & FORMAT(ABS(_pct), "0.0%")
+VAR _lyFmt     = FORMAT(_salesLY, "#,##0")
+
+-- Build monthly trend table (last 12 months)
+VAR _maxDate = MAX('Dates'[Date])
+VAR _monthlyTable =
+    ADDCOLUMNS(
+        SUMMARIZE(
+            CALCULATETABLE(
+                'Dates',
+                DATESINPERIOD('Dates'[Date], _maxDate, -12, MONTH)
+            ),
+            'Dates'[Year], 'Dates'[MonthNo]
+        ),
+        "MonthSales", CALCULATE([Total Sales])
+    )
+VAR _minVal = MINX(_monthlyTable, [MonthSales])
+VAR _maxVal = MAXX(_monthlyTable, [MonthSales])
+VAR _range  = MAX(_maxVal - _minVal, 1)
+VAR _n      = COUNTROWS(_monthlyTable)
+
+VAR _chartW = 100
+VAR _chartH = 36
+VAR _step   = DIVIDE(_chartW, MAX(_n - 1, 1))
+
+VAR _indexedTable =
+    ADDCOLUMNS(
+        _monthlyTable,
+        "Idx", RANKX(_monthlyTable, [Year] * 100 + [MonthNo], , ASC, DENSE) - 1
+    )
+
+VAR _points =
+    CONCATENATEX(
+        _indexedTable,
+        VAR _x = [Idx] * _step
+        VAR _y = 4 + (_chartH - 8) - DIVIDE(([MonthSales] - _minVal), _range) * (_chartH - 8)
+        RETURN ROUND(_x, 1) & "," & ROUND(_y, 1),
+        " ",
+        [Idx], ASC
+    )
+
+VAR _areaPoints = "0," & _chartH & " " & _points & " " & _chartW & "," & _chartH
+
+RETURN
+"<div style='font-family:Segoe UI, sans-serif; background:#fff; border:1px solid #E5E7EB; border-radius:16px; padding:18px 0; width:fit-content; min-width:280px; max-width:100%; box-sizing:border-box; overflow:visible;'>" &
+
+  "<div style='display:flex; align-items:center; gap:6px; margin-bottom:12px; white-space:nowrap; padding:0 22px;'>" &
+    "<svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='" & _lineColor & "' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'>" &
+      "<polyline points='2,17 9,10 13,14 22,4'></polyline>" &
+      "<polyline points='16,4 22,4 22,10'></polyline>" &
+    "</svg>" &
+    "<span style='color:#4B5563; font-size:13px; font-weight:600;'>Sales</span>" &
+  "</div>" &
+
+  "<div style='display:flex; align-items:center; gap:10px; flex-wrap:nowrap; margin-bottom:12px; white-space:nowrap; padding:0 22px;'>" &
+    "<span style='font-size:34px; font-weight:700; color:#111827; white-space:nowrap;'>" & _salesFmt & "</span>" &
+    "<span style='background:" & _pillBg & "; color:" & _pillText & "; padding:3px 9px; border-radius:11px; font-size:12px; font-weight:600; white-space:nowrap;'>" & _diffFmt & "</span>" &
+    "<span style='background:" & _pillBg & "; color:" & _pillText & "; padding:3px 9px; border-radius:11px; font-size:12px; font-weight:600; white-space:nowrap;'>" & _pctFmt & "</span>" &
+  "</div>" &
+
+  "<div style='width:100%; box-sizing:border-box; margin-bottom:10px;'>" &
+    "<svg width='100%' height='36' viewBox='0 0 " & _chartW & " " & _chartH & "' preserveAspectRatio='none' style='display:block; width:100%;'>" &
+      "<defs>" &
+        "<linearGradient id='areaGrad' x1='0' y1='0' x2='0' y2='1'>" &
+          "<stop offset='0%' stop-color='" & _lineColor & "' stop-opacity='0.25'></stop>" &
+          "<stop offset='100%' stop-color='" & _lineColor & "' stop-opacity='0'></stop>" &
+        "</linearGradient>" &
+      "</defs>" &
+      "<polygon points='" & _areaPoints & "' fill='url(#areaGrad)'></polygon>" &
+      "<polyline points='" & _points & "' fill='none' stroke='" & _lineColor & "' stroke-width='1.8' vector-effect='non-scaling-stroke' stroke-linecap='round' stroke-linejoin='round'></polyline>" &
+    "</svg>" &
+  "</div>" &
+
+  "<div style='font-size:12px; color:#6B7280; white-space:nowrap; padding:0 22px;'>vs <b style='color:#374151;'>" & _lyFmt & "</b> last year</div>" &
+"</div>"
